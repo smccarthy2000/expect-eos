@@ -1,0 +1,76 @@
+#!/usr/bin/expect
+# This is a dumb program which conencts over ssh to an arista device
+# 
+# its  a fairly generic stub which could be modified to do whatever
+# you want through expect
+
+# set the terminal to dumb so you don't get trailing gibberish
+set env(TERM) dumb
+
+# create this global var if we have proc's
+# global spawn_id
+set timeout 9
+set user [ lindex $argv 0]
+set passwd [ lindex $argv 1]
+set enable [ lindex $argv 2]
+set host [ lindex $argv 3]
+log_user 1
+
+#################################################
+# verify 
+if {[llength $argv] != 4} {
+   puts "Usage: anet-interact <user> <passwd> <enable> <hostname/ip>"
+   puts ""
+   exit 1
+}
+
+#################################################
+# programmatic commands
+set enterEnable "enable\r"
+
+#################################################
+# TODO ERROR_CHECK
+#
+# try ping before connecting, however there are
+# different ping clients for different OSs
+
+spawn ssh $host
+#set spid $spawn_id
+expect {
+   default {
+        send_user "\n Failed to connect to $user\n"
+        exit 1
+    }
+   "Are you sure you want to continue connecting" {
+        exp_send "yes\r"
+        exp_continue
+    }
+   "Permission denied" {
+        puts "invalid username/password combination for $host"
+        exit 1
+    }
+   "Password" {
+        exp_send "$passwd\r"
+        exp_continue
+    }
+    "*>" {
+        exp_send "$enterEnable"
+    }
+    "*#" {
+        exp_send "\r"
+    }
+}
+
+expect {
+   "Password" {
+        exp_send "$enable\r"
+        exp_continue
+    }
+   "Bad secret" {
+        puts "invalid enable password for $host"
+        exit 1
+    }
+    "*#" {
+       interact
+   }
+}
